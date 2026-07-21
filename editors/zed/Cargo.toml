@@ -1,0 +1,19 @@
+[package]
+name = "jsonl-tools-zed"
+version = "0.1.0"
+edition = "2021"
+license = "0BSD"
+repository = "https://github.com/sarvagnan/jsonl-tools"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+zed_extension_api = "=0.7.0"
+
+[profile.release]
+lto = true
+opt-level = "z"
+strip = true

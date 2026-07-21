@@ -1,3 +1,5 @@
 node_modules/
 editors/bbedit/module/build/
 .DS_Store
+editors/zed/target/
+editors/zed/grammars/
