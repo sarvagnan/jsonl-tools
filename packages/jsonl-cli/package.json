@@ -1,6 +1,6 @@
 {
   "name": "@sarvagnan/jsonl-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Command-line validation and formatting for JSON Lines / NDJSON files.",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
     "bin"
   ],
   "dependencies": {
-    "@sarvagnan/jsonl-core": "^0.1.0"
+    "@sarvagnan/jsonl-core": "^0.2.0"
   },
   "scripts": {
     "test": "node --test"
