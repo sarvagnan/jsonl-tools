@@ -18,5 +18,10 @@
   "engines": {
     "node": ">=20"
   },
-  "license": "0BSD"
+  "license": "0BSD",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sarvagnan/jsonl-tools.git",
+    "directory": "packages/jsonl-cli"
+  }
 }
