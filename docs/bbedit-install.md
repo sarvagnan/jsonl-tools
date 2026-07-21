@@ -52,12 +52,21 @@ parse errors appear in the text view's gutter as you type.
 
 ## 3. Text filters
 
-Install the scripts from `editors/bbedit/filters` into BBEdit's Text Filters
-folder (`~/Library/Application Support/BBEdit/Text Filters`):
+Install with:
+
+```bash
+./editors/bbedit/install-filters.sh
+```
+
+This generates wrappers in `~/Library/Application Support/BBEdit/Text
+Filters` for:
 
 - `Validate JSONL.sh`
 - `Normalize JSONL.sh`
-- `Pretty Print JSONL Record.sh`
+- `Pretty Print JSONL Record.sh` — expands one selected record into
+  indented JSON for inspection (⌘Z collapses it back)
 
-The scripts use the repository CLI when run in place. After `npm link`,
-`jsonl` is on `PATH`; alternatively set `JSONL_CLI` to the CLI script path.
+Don't copy the scripts by hand: BBEdit runs filters with a minimal `PATH`
+that lacks `node`, and the scripts locate the repository CLI relative to
+their own location. The generated wrappers fix both, and delegate into the
+repository so installed filters always track the current code.
