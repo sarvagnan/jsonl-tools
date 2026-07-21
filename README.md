@@ -1,8 +1,16 @@
 # jsonl-tools
 
-JSON Lines / NDJSON tooling: a shared parsing core, a CLI, and a Language
-Server Protocol server — plus editor integrations that consume them.
-BBEdit is the first integration; the packages themselves are editor-neutral.
+## Why this exists
+
+LLM agents and web tools emit JSON Lines everywhere — transcripts, logs,
+tool output, eval results — but none of the editors I use supported the
+format as such: at best a `.jsonl` file gets mis-highlighted as JSON and
+flagged as one big syntax error. I especially wanted proper support in
+BBEdit, which is what I reach for to preview files. So: JSON Lines /
+NDJSON tooling built from a shared parsing core — a CLI, a Language
+Server Protocol server, and editor integrations that consume them.
+BBEdit is the first integration (a native compiled language module);
+the packages themselves are editor-neutral.
 
 Layout:
 
