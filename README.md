@@ -12,6 +12,9 @@ Server Protocol server, and editor integrations that consume them.
 BBEdit is the first integration (a native compiled language module);
 the packages themselves are editor-neutral.
 
+Fittingly, this project is fully vibe coded — written end to end by
+Claude, from the BBEdit SDK research to the compiled language module.
+
 Layout:
 
 - `packages/jsonl-core` (`@sarva/jsonl-core`): line-by-line JSONL parsing,
