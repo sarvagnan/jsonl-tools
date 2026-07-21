@@ -4,7 +4,7 @@
   "description": "Language Server Protocol server (stdio) providing diagnostics and formatting for JSON Lines / NDJSON.",
   "type": "module",
   "bin": {
-    "jsonl-lsp": "./bin/jsonl-lsp.js"
+    "jsonl-lsp": "bin/jsonl-lsp.js"
   },
   "files": [
     "bin"

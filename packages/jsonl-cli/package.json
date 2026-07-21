@@ -4,7 +4,7 @@
   "description": "Command-line validation and formatting for JSON Lines / NDJSON files.",
   "type": "module",
   "bin": {
-    "jsonl": "./bin/jsonl.js"
+    "jsonl": "bin/jsonl.js"
   },
   "files": [
     "bin"
