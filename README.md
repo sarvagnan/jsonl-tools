@@ -111,4 +111,6 @@ text filters.
 npm install           # once, at the root
 npm test              # workspace packages + editor filter scripts
 npm run test:module   # compiled module: harness + reformat parity with the CLI
+                      # (byte parity is over LF documents; in the editor the
+                      # module preserves existing CR/CRLF line endings)
 ```

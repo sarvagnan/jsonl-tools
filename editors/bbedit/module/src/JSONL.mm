@@ -50,8 +50,11 @@ static inline bool IsStructuralChar(const UniChar c)
 	return ('{' == c) || ('}' == c) || ('[' == c) || (']' == c) || (':' == c) || (',' == c);
 }
 
-//	Validate a complete lexeme against the JSON number grammar.
-static bool IsValidJSONNumber(const UniChar *chars, const size_t length)
+//	Validate a complete lexeme against the JSON number grammar. CharAt is
+//	any indexable source of UniChars, so this works over both contiguous
+//	buffers and gap-aware text iterators.
+template <typename CharAt>
+static bool ValidateJSONNumber(CharAt chars, const size_t length)
 {
 	size_t	i = 0;
 
@@ -99,6 +102,11 @@ static bool IsValidJSONNumber(const UniChar *chars, const size_t length)
 	}
 
 	return (i == length);
+}
+
+static bool IsValidJSONNumber(const UniChar *chars, const size_t length)
+{
+	return ValidateJSONNumber(chars, length);
 }
 
 #pragma mark - Per-line JSON parser
@@ -633,6 +641,7 @@ static OSErr CalculateRuns(BBLMParamBlock &params, const BBLMCallbackBlock &call
 
 			const SInt32	stringStart = pos;
 			bool			terminated = false;
+			bool			contentsValid = true;
 
 			++iter;
 			pos++;
@@ -649,14 +658,43 @@ static OSErr CalculateRuns(BBLMParamBlock &params, const BBLMCallbackBlock &call
 					++iter;
 					pos++;
 
-					if ((pos < textLength) && (! BBLMCharacterIsLineBreak(*iter)))
+					if ((pos >= textLength) || BBLMCharacterIsLineBreak(*iter))
 					{
-						++iter;
-						pos++;
+						contentsValid = false;
+						continue;
+					}
+
+					const UniChar	ec = *iter;
+
+					++iter;
+					pos++;
+
+					if ('u' == ec)
+					{
+						for (int i = 0; i < 4; i++)
+						{
+							if ((pos >= textLength) || (! IsHexDigit(*iter)))
+							{
+								contentsValid = false;
+								break;
+							}
+
+							++iter;
+							pos++;
+						}
+					}
+					else if (('"' != ec) && ('\\' != ec) && ('/' != ec) &&
+							 ('b' != ec) && ('f' != ec) && ('n' != ec) &&
+							 ('r' != ec) && ('t' != ec))
+					{
+						contentsValid = false;
 					}
 
 					continue;
 				}
+
+				if (sc < ' ')
+					contentsValid = false;	//	unescaped control character
 
 				++iter;
 				pos++;
@@ -670,7 +708,7 @@ static OSErr CalculateRuns(BBLMParamBlock &params, const BBLMCallbackBlock &call
 
 			NSString	*kind = nil;
 
-			if (! terminated)
+			if ((! terminated) || (! contentsValid))
 			{
 				kind = kBBLMSyntaxErrorRunKind;
 			}
@@ -704,10 +742,8 @@ static OSErr CalculateRuns(BBLMParamBlock &params, const BBLMCallbackBlock &call
 			if (! keepGoing)
 				break;
 
-			const SInt32	numberStart = pos;
-			UniChar			lexeme[64];
-			size_t			lexemeLength = 0;
-			bool			overflow = false;
+			const SInt32		numberStart = pos;
+			BBLMTextIterator	numberIter(iter);
 
 			while (pos < textLength)
 			{
@@ -716,11 +752,6 @@ static OSErr CalculateRuns(BBLMParamBlock &params, const BBLMCallbackBlock &call
 				if (IsDigit(nc) || ('-' == nc) || ('+' == nc) ||
 					('.' == nc) || ('e' == nc) || ('E' == nc))
 				{
-					if (lexemeLength < (sizeof(lexeme) / sizeof(lexeme[0])))
-						lexeme[lexemeLength++] = nc;
-					else
-						overflow = true;
-
 					++iter;
 					pos++;
 				}
@@ -730,7 +761,7 @@ static OSErr CalculateRuns(BBLMParamBlock &params, const BBLMCallbackBlock &call
 				}
 			}
 
-			const bool	valid = (! overflow) && IsValidJSONNumber(lexeme, lexemeLength);
+			const bool	valid = ValidateJSONNumber(numberIter, (size_t)(pos - numberStart));
 
 			keepGoing = bblmAddRun(&callbacks, kJSONLLanguageCode,
 									valid ? kBBLMNumberRunKind : kBBLMSyntaxErrorRunKind,
@@ -853,7 +884,13 @@ static NSString *TruncateForDisplay(NSString *s, const NSUInteger maxLength)
 	if ([s length] <= maxLength)
 		return s;
 
-	return [[s substringToIndex: maxLength] stringByAppendingString: @"…"];
+	//	never cut a surrogate pair in half
+	NSUInteger	cut = maxLength;
+
+	if (CFStringIsSurrogateHighCharacter([s characterAtIndex: cut - 1]))
+		cut--;
+
+	return [[s substringToIndex: cut] stringByAppendingString: @"…"];
 }
 
 static NSString *RecordMenuTitle(const UInt32 lineNumber,
@@ -1015,9 +1052,11 @@ static void GuessLanguage(BBLMParamBlock &params)
 
 		examinedLines++;
 
-		if (('{' == firstChar) && ('}' == lastChar))
+		//	JSONL records are usually objects, but arrays are valid too
+		if ((('{' == firstChar) && ('}' == lastChar)) ||
+			(('[' == firstChar) && (']' == lastChar)))
 			objectLines++;
-		else if ('{' != firstChar)
+		else if (('{' != firstChar) && ('[' != firstChar))
 			sawForeignLine = true;
 	}
 

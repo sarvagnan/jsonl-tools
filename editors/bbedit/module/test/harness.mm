@@ -283,6 +283,48 @@ static void TestCalculateRuns(const BBLMCallbackBlock &callbacks)
 	printf("ok: CalculateRuns (%zu runs)\n", sRuns.size());
 }
 
+static void TestStrictTokenColoring(const BBLMCallbackBlock &callbacks)
+{
+	NSString	*source =
+		@"{\"ok\": \"a\\u0041b\"}\n"						//	valid unicode escape
+		 "{\"bad\": \"a\\x\"}\n"							//	invalid escape
+		 "{\"badu\": \"\\u12Z4\"}\n"						//	malformed unicode escape
+		 "{\"big\": 1234567890123456789012345678901234567890123456789012345678901234567890}\n";
+
+	std::vector<UniChar>	text = ToUTF16(source);
+	BBLMParamBlock			params = MakeParams(text, kBBLMCalculateRunsMessage);
+
+	sRuns.clear();
+	params.fCalcRunParams.fStartOffset = 0;
+
+	CHECK(noErr == JSONLMachO(params, callbacks), "CalculateRuns returned an error");
+
+	NSUInteger	offset;
+
+	offset = [source rangeOfString: @"\"a\\u0041b\""].location;
+	CHECK([RunKindAt((SInt32)offset) isEqualToString: kBBLMDoubleQuotedStringRunKind],
+			"valid unicode escape wrongly flagged");
+
+	offset = [source rangeOfString: @"\"a\\x\""].location;
+	CHECK([RunKindAt((SInt32)offset) isEqualToString: kBBLMSyntaxErrorRunKind],
+			"invalid escape not flagged");
+
+	offset = [source rangeOfString: @"\"\\u12Z4\""].location;
+	CHECK([RunKindAt((SInt32)offset) isEqualToString: kBBLMSyntaxErrorRunKind],
+			"malformed unicode escape not flagged");
+
+	offset = [source rangeOfString: @"1234567890"].location;
+	{
+		const SInt32	index = FakeFindRun((SInt32)offset);
+
+		CHECK([sRuns[index].kind isEqualToString: kBBLMNumberRunKind],
+				"70-digit number wrongly flagged (undocumented length cap?)");
+		CHECK(70 == sRuns[index].length, "long number lexeme split (length %d)", sRuns[index].length);
+	}
+
+	printf("ok: StrictTokenColoring\n");
+}
+
 static void TestAdjustRange(const BBLMCallbackBlock &callbacks, std::vector<UniChar> &text)
 {
 	//	sRuns still holds the run list from TestCalculateRuns; pick a run that
@@ -365,6 +407,7 @@ static SInt16 GuessFor(NSString *source, const BBLMCallbackBlock &callbacks)
 static void TestGuessLanguage(const BBLMCallbackBlock &callbacks)
 {
 	CHECK(kBBLMGuessDefiniteYes == GuessFor(@"{\"a\":1}\n{\"b\":2}\n", callbacks), "two records should be a definite yes");
+	CHECK(kBBLMGuessDefiniteYes == GuessFor(@"[1]\n[2]\n", callbacks), "array records should be a definite yes");
 	CHECK(kBBLMGuessMaybe == GuessFor(@"{\"a\":1}\n", callbacks), "single record should be a maybe (could be JSON)");
 	CHECK(kBBLMGuessDefiniteNo == GuessFor(@"# A markdown heading\n\nSome prose.\n", callbacks), "prose should be a definite no");
 	CHECK(kBBLMGuessDefiniteNo == GuessFor(@"", callbacks), "empty text should be a definite no");
@@ -486,6 +529,7 @@ int main(int argc, char *argv[])
 			TestAdjustRange(callbacks, text);
 		}
 
+		TestStrictTokenColoring(callbacks);
 		TestScanForFunctions(callbacks);
 		TestGuessLanguage(callbacks);
 		TestWordLookup(callbacks);

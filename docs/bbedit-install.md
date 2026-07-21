@@ -28,7 +28,10 @@ Relaunch BBEdit to load it. You get:
 - **Text ▸ Reformat Document** normalizes every valid record to the same
   fully compact form `jsonl format` produces (key order and number
   lexemes preserved); invalid and blank lines pass through untouched.
-  Reformatting a selection works too.
+  Reformatting a selection works too. One deliberate difference from the
+  CLI: the module preserves each line's existing ending (CR/CRLF/LF)
+  rather than rewriting it, so byte-for-byte parity with `jsonl format`
+  holds for LF documents.
 
 The module declares the same capability set as BBEdit's built-in JSON
 language (coloring, function scanning, reformat, word lookup, language

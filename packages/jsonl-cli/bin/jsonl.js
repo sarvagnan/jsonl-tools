@@ -216,6 +216,16 @@ function parseCommonArgs(args, { allowCheck }) {
   };
 }
 
+function parseIndent(raw) {
+  if (!/^\d+$/.test(raw ?? "")) {
+    return null;
+  }
+
+  const value = Number.parseInt(raw, 10);
+
+  return value >= 0 && value <= 16 ? value : null;
+}
+
 function parsePrettyRecordArgs(args) {
   const files = [];
   let indent = 2;
@@ -224,9 +234,9 @@ function parsePrettyRecordArgs(args) {
     const arg = args[index];
 
     if (arg === "--indent") {
-      const value = Number.parseInt(args[index + 1], 10);
+      const value = parseIndent(args[index + 1]);
 
-      if (!Number.isInteger(value) || value < 0 || value > 16) {
+      if (value === null) {
         return { error: "--indent expects an integer from 0 to 16" };
       }
 
@@ -236,9 +246,9 @@ function parsePrettyRecordArgs(args) {
     }
 
     if (arg.startsWith("--indent=")) {
-      const value = Number.parseInt(arg.slice("--indent=".length), 10);
+      const value = parseIndent(arg.slice("--indent=".length));
 
-      if (!Number.isInteger(value) || value < 0 || value > 16) {
+      if (value === null) {
         return { error: "--indent expects an integer from 0 to 16" };
       }
 
@@ -294,6 +304,15 @@ function writeUsageError(message) {
 function displayName(file) {
   return file === "-" ? "<stdin>" : file;
 }
+
+//	exit quietly when a downstream pipe closes early (e.g. `jsonl ... | head`)
+process.stdout.on("error", (error) => {
+  if (error.code === "EPIPE") {
+    process.exit(0);
+  }
+
+  throw error;
+});
 
 main(process.argv.slice(2)).then(
   (code) => {

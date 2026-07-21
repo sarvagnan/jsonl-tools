@@ -14,24 +14,33 @@ export class JsonLineParseError extends Error {
 }
 
 class JsonLineParser {
-  constructor(text) {
+  //	With no indent, renders the record fully compact. With a positive
+  //	indent, renders it pretty-printed in JSON.stringify style — but from
+  //	the source lexemes, so number text, key order, and duplicate keys are
+  //	preserved exactly.
+  constructor(text, options = {}) {
     this.text = text;
     this.index = 0;
+    this.indent = options.indent ?? 0;
   }
 
   parse() {
     this.skipWhitespace();
-    const compact = this.parseValue();
+    const rendered = this.parseValue(0);
     this.skipWhitespace();
 
     if (!this.isEnd()) {
       this.fail("Unexpected non-whitespace character after JSON value");
     }
 
-    return compact;
+    return rendered;
   }
 
-  parseValue() {
+  pad(depth) {
+    return " ".repeat(this.indent * depth);
+  }
+
+  parseValue(depth) {
     if (this.isEnd()) {
       this.fail("Expected JSON value");
     }
@@ -39,11 +48,11 @@ class JsonLineParser {
     const char = this.peek();
 
     if (char === "{") {
-      return this.parseObject();
+      return this.parseObject(depth);
     }
 
     if (char === "[") {
-      return this.parseArray();
+      return this.parseArray(depth);
     }
 
     if (char === '"') {
@@ -63,7 +72,7 @@ class JsonLineParser {
     this.fail("Expected JSON value");
   }
 
-  parseObject() {
+  parseObject(depth) {
     this.consume("{");
     this.skipWhitespace();
 
@@ -83,13 +92,13 @@ class JsonLineParser {
       this.skipWhitespace();
       this.consume(":", "Expected ':' after object property name");
       this.skipWhitespace();
-      const value = this.parseValue();
-      members.push(`${key}:${value}`);
+      const value = this.parseValue(depth + 1);
+      members.push(this.indent > 0 ? `${key}: ${value}` : `${key}:${value}`);
       this.skipWhitespace();
 
       if (this.peek() === "}") {
         this.advance();
-        return `{${members.join(",")}}`;
+        return this.wrapContainer("{", "}", members, depth);
       }
 
       this.consume(",", "Expected ',' or '}' after object property value");
@@ -101,7 +110,7 @@ class JsonLineParser {
     }
   }
 
-  parseArray() {
+  parseArray(depth) {
     this.consume("[");
     this.skipWhitespace();
 
@@ -113,12 +122,12 @@ class JsonLineParser {
     const items = [];
 
     while (true) {
-      items.push(this.parseValue());
+      items.push(this.parseValue(depth + 1));
       this.skipWhitespace();
 
       if (this.peek() === "]") {
         this.advance();
-        return `[${items.join(",")}]`;
+        return this.wrapContainer("[", "]", items, depth);
       }
 
       this.consume(",", "Expected ',' or ']' after array item");
@@ -128,6 +137,15 @@ class JsonLineParser {
         this.fail("Trailing commas are not valid JSON");
       }
     }
+  }
+
+  wrapContainer(open, close, parts, depth) {
+    if (this.indent > 0) {
+      const inner = this.pad(depth + 1);
+      return `${open}\n${inner}${parts.join(`,\n${inner}`)}\n${this.pad(depth)}${close}`;
+    }
+
+    return `${open}${parts.join(",")}${close}`;
   }
 
   parseString() {
@@ -291,7 +309,7 @@ export function parseJsonLines(text, options = {}) {
   const diagnostics = [];
 
   for (const line of lines) {
-    if (line.text.trim().length === 0) {
+    if (isBlankLine(line.text)) {
       if (!settings.allowBlankLines) {
         diagnostics.push(createDiagnostic(line.number, 1, "Blank lines are not valid JSON Lines"));
       }
@@ -378,10 +396,15 @@ export function formatJsonRecord(text, options = {}) {
     };
   }
 
+  //	re-render from source lexemes rather than JSON.parse/stringify, so
+  //	large integers, unusual exponents, key order, and duplicate keys all
+  //	survive pretty-printing exactly
+  const pretty = new JsonLineParser(parsed.records[0].raw, { indent }).parse();
+
   return {
     ok: true,
     diagnostics: [],
-    output: `${JSON.stringify(parsed.records[0].value, null, indent)}\n`
+    output: `${pretty}\n`
   };
 }
 
@@ -482,6 +505,12 @@ function hasFinalLineEnding(text) {
 
 function isJsonWhitespace(char) {
   return char === " " || char === "\t";
+}
+
+//	Blank-line detection must use the same whitespace definition as the
+//	parser: a line of non-breaking spaces is malformed JSON, not blank.
+function isBlankLine(text) {
+  return /^[ \t]*$/.test(text);
 }
 
 function isDigit(char) {

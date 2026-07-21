@@ -75,6 +75,72 @@ test("lsp publishes diagnostics and document formatting edits", async () => {
   }
 });
 
+test("lsp answers malformed frames with protocol errors and stays alive", async () => {
+  const server = spawn(process.execPath, [LSP], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const client = new LspTestClient(server);
+
+  try {
+    server.stdin.write("Content-Length: 5\r\n\r\n{bad}");
+    const parseError = await client.nextErrorResponse();
+    assert.equal(parseError.error.code, -32700);
+
+    server.stdin.write("Content-Length: 4\r\n\r\nnull");
+    const invalidRequest = await client.nextErrorResponse();
+    assert.equal(invalidRequest.error.code, -32600);
+
+    const init = await client.request("initialize", { capabilities: {} });
+    assert.ok(init.capabilities, "server should still answer after malformed frames");
+  } finally {
+    await client.shutdown();
+  }
+});
+
+test("lsp applies ranged didChange deltas instead of clobbering the document", async () => {
+  const server = spawn(process.execPath, [LSP], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const client = new LspTestClient(server);
+
+  try {
+    await client.request("initialize", { capabilities: {} });
+
+    client.notify("textDocument/didOpen", {
+      textDocument: {
+        uri: "file:///tmp/delta.jsonl",
+        languageId: "jsonl",
+        version: 1,
+        text: ' { "a" : 1 }\n'
+      }
+    });
+    await client.nextNotification("textDocument/publishDiagnostics");
+
+    client.notify("textDocument/didChange", {
+      textDocument: { uri: "file:///tmp/delta.jsonl", version: 2 },
+      contentChanges: [
+        {
+          range: {
+            start: { line: 0, character: 9 },
+            end: { line: 0, character: 10 }
+          },
+          text: "2"
+        }
+      ]
+    });
+    await client.nextNotification("textDocument/publishDiagnostics");
+
+    const edits = await client.request("textDocument/formatting", {
+      textDocument: { uri: "file:///tmp/delta.jsonl" },
+      options: { tabSize: 2, insertSpaces: true }
+    });
+
+    assert.equal(edits[0].newText, '{"a":2}\n');
+  } finally {
+    await client.shutdown();
+  }
+});
+
 class LspTestClient {
   constructor(child) {
     this.child = child;
@@ -83,6 +149,8 @@ class LspTestClient {
     this.pending = new Map();
     this.notifications = [];
     this.notificationWaiters = [];
+    this.errorResponses = [];
+    this.errorWaiters = [];
 
     child.stdout.on("data", (chunk) => {
       this.buffer = Buffer.concat([this.buffer, chunk]);
@@ -155,7 +223,29 @@ class LspTestClient {
     }
   }
 
+  nextErrorResponse() {
+    if (this.errorResponses.length > 0) {
+      return Promise.resolve(this.errorResponses.shift());
+    }
+
+    return new Promise((resolve) => {
+      this.errorWaiters.push(resolve);
+    });
+  }
+
   handleMessage(message) {
+    if (message.error && !this.pending.has(message.id)) {
+      const waiter = this.errorWaiters.shift();
+
+      if (waiter) {
+        waiter(message);
+      } else {
+        this.errorResponses.push(message);
+      }
+
+      return;
+    }
+
     if (message.id !== undefined && this.pending.has(message.id)) {
       const pending = this.pending.get(message.id);
       this.pending.delete(message.id);

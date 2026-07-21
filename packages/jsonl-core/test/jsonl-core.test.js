@@ -142,3 +142,28 @@ test("splits physical lines without adding a phantom final line", () => {
     ]
   );
 });
+
+test("pretty printing preserves numeric lexemes, key order, and duplicate keys", () => {
+  const result = formatJsonRecord('{"big":9007199254740993,"huge":1e400,"z":1,"a":2,"z":3}');
+
+  assert.equal(result.ok, true);
+  assert.equal(
+    result.output,
+    '{\n  "big": 9007199254740993,\n  "huge": 1e400,\n  "z": 1,\n  "a": 2,\n  "z": 3\n}\n'
+  );
+});
+
+test("pretty printing with indent 0 stays compact", () => {
+  const result = formatJsonRecord('{ "a" : [ 1 , 2 ] }', { indent: 0 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.output, '{"a":[1,2]}\n');
+});
+
+test("a line of non-breaking spaces is malformed JSON, not blank", () => {
+  const result = validateJsonLines("{\"a\":1}\n  \n", { allowBlankLines: true });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0].line, 2);
+});

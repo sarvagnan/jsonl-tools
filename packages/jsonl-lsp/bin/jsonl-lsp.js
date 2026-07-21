@@ -42,14 +42,33 @@ function readMessages() {
 
     const payload = buffer.subarray(messageStart, messageEnd).toString("utf8");
     buffer = buffer.subarray(messageEnd);
-    handleMessage(JSON.parse(payload));
+
+    let message;
+
+    try {
+      message = JSON.parse(payload);
+    } catch {
+      respondError(null, -32700, "Parse error");
+      continue;
+    }
+
+    handleMessage(message);
   }
 }
 
 function handleMessage(message) {
-  if (message.method) {
+  if (message === null || typeof message !== "object" || Array.isArray(message)) {
+    respondError(null, -32600, "Invalid Request");
+    return;
+  }
+
+  if (typeof message.method === "string") {
     handleRequestOrNotification(message);
     return;
+  }
+
+  if (message.id !== undefined && !("result" in message) && !("error" in message)) {
+    respondError(message.id, -32600, "Invalid Request");
   }
 }
 
@@ -99,11 +118,31 @@ function handleRequestOrNotification(message) {
 
     if (method === "textDocument/didChange") {
       const uri = params.textDocument.uri;
-      const change = params.contentChanges.at(-1);
+      const document = documents.get(uri);
+      let text = document?.text ?? "";
+      let applied = false;
 
-      if (change && typeof change.text === "string") {
+      //	the server advertises full sync, but apply ranged deltas correctly
+      //	anyway rather than clobbering the document with the delta text
+      for (const change of params.contentChanges ?? []) {
+        if (!change || typeof change.text !== "string") {
+          continue;
+        }
+
+        if (change.range) {
+          const start = offsetAt(text, change.range.start);
+          const end = offsetAt(text, change.range.end);
+          text = text.slice(0, start) + change.text + text.slice(end);
+        } else {
+          text = change.text;
+        }
+
+        applied = true;
+      }
+
+      if (applied) {
         documents.set(uri, {
-          text: change.text,
+          text,
           version: params.textDocument.version ?? null
         });
         publishDiagnostics(uri);
@@ -147,10 +186,12 @@ function publishDiagnostics(uri) {
   }
 
   const result = validateJsonLines(document.text, settings);
+  const lines = document.text.split(/\r\n|\r|\n/);
+
   notify("textDocument/publishDiagnostics", {
     uri,
     version: document.version,
-    diagnostics: result.diagnostics.map(toLspDiagnostic)
+    diagnostics: result.diagnostics.map((diagnostic) => toLspDiagnostic(diagnostic, lines))
   });
 }
 
@@ -202,14 +243,16 @@ function formatRange(uri, range) {
   ];
 }
 
-function toLspDiagnostic(diagnostic) {
+function toLspDiagnostic(diagnostic, lines) {
   const line = diagnostic.line - 1;
-  const character = diagnostic.column - 1;
+  const lineLength = lines[line]?.length ?? 0;
+  const character = Math.min(diagnostic.column - 1, lineLength);
+  const endCharacter = Math.min(character + 1, lineLength);
 
   return {
     range: {
       start: { line, character },
-      end: { line, character: character + 1 }
+      end: { line, character: Math.max(endCharacter, character) }
     },
     severity: 1,
     source: "jsonl",
