@@ -27,6 +27,9 @@ This project is fully vibe coded — written end to end by Claude.
   coloring, function menu with per-record summaries, Reformat Document,
   language guessing, LSP hookup) built against the official Bare Bones
   Language Module SDK, plus text filters
+- `editors/zed`: Zed extension — JSONL language (tree-sitter-json grammar)
+  with `jsonl-lsp` auto-installed from npm for diagnostics, formatting, and
+  record outlines; see [editors/zed/README.md](editors/zed/README.md)
 
 The packages are npm workspaces; everything below assumes `npm install`
 has been run once at the root (it wires up the cross-package symlinks).
