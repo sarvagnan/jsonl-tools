@@ -36,3 +36,23 @@ Without that setting, Zed can use the extension's basic tree-sitter structural o
   }
 }
 ```
+
+## Server configuration
+
+`jsonl-lsp` accepts initialization options under the `jsonl` key, forwarded
+from Zed's standard LSP settings:
+
+```json
+{
+  "lsp": {
+    "jsonl-lsp": {
+      "initialization_options": {
+        "jsonl": {
+          "allowBlankLines": false,
+          "finalNewline": "preserve"
+        }
+      }
+    }
+  }
+}
+```

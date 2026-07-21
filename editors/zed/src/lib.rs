@@ -1,6 +1,6 @@
 use std::{env, fs};
 
-use zed_extension_api::{self as zed, LanguageServerId, Result};
+use zed_extension_api::{self as zed, LanguageServerId, Result, serde_json, settings::LspSettings};
 
 const LANGUAGE_SERVER_ID: &str = "jsonl-lsp";
 const PACKAGE_NAME: &str = "@sarvagnan/jsonl-lsp";
@@ -104,6 +104,18 @@ impl zed::Extension for JsonlToolsExtension {
             args: vec![server_path, "--stdio".to_string()],
             env: Default::default(),
         })
+    }
+
+    //	forwards `lsp.jsonl-lsp.initialization_options` from Zed settings so
+    //	users can configure the server (e.g. jsonl.allowBlankLines)
+    fn language_server_initialization_options(
+        &mut self,
+        language_server_id: &LanguageServerId,
+        worktree: &zed::Worktree,
+    ) -> Result<Option<serde_json::Value>> {
+        Ok(LspSettings::for_worktree(language_server_id.as_ref(), worktree)
+            .ok()
+            .and_then(|settings| settings.initialization_options))
     }
 }
 
