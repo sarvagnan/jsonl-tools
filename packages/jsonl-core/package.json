@@ -1,0 +1,19 @@
+{
+  "name": "@sarva/jsonl-core",
+  "version": "0.1.0",
+  "description": "Line-by-line JSON Lines / NDJSON parsing, validation diagnostics, and normalization.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

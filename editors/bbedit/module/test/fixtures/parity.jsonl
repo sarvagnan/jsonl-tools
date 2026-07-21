@@ -1,0 +1,4 @@
+{ "b" : 1 , "a" : [ 1 , 2.50 , true ] }
+{"nested": { "x" : "a b" , "y" : null }, "n": -1.5e+3}
+{"already":"compact"}
+{ "esc" : "he \"llo\" \u00e9" }

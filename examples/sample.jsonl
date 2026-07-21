@@ -1,0 +1,4 @@
+{"type":"assistant","id":42,"content":"hello world","ok":true,"score":-1.5e+3}
+{"type":"tool_result","name":"WebFetch","status":null,"bytes":20481}
+{"broken json here}
+{"event":"session.end","duration":12.5}

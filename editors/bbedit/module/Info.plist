@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>JSONL</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.sarvagnan.bblm.jsonl</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>JSON Lines Language Module</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleSignature</key>
+	<string>BBLM</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1.0.0</string>
+	<key>CSResourcesFileMapped</key>
+	<true/>
+	<key>com.barebones.bblminfo</key>
+	<array>
+		<dict>
+			<key>BBLMLanguageDisplayName</key>
+			<string>JSON Lines</string>
+			<key>BBLMLanguageCode</key>
+			<string>JsnL</string>
+			<key>BBLMEntryPointName</key>
+			<string>JSONLMachO</string>
+			<key>BBLMColorsSyntax</key>
+			<true/>
+			<key>BBLMScansFunctions</key>
+			<true/>
+			<key>BBLMCanGuessLanguage</key>
+			<true/>
+			<key>BBLMIsCaseSensitive</key>
+			<true/>
+			<key>BBLMSupportsReformatDocument</key>
+			<true/>
+			<key>BBLMSupportsWordLookup</key>
+			<true/>
+			<key>BBLMFiltersRunsForSpellChecking</key>
+			<false/>
+			<key>BBLMCommentPrefixDefault</key>
+			<string></string>
+			<key>BBLMFilenameExtensions</key>
+			<array>
+				<string>jsonl</string>
+				<string>ndjson</string>
+				<string>ldjson</string>
+			</array>
+			<key>BBLMPreferredFilenameExtension</key>
+			<string>jsonl</string>
+			<key>BBLMEmacsModeNames</key>
+			<array>
+				<string>jsonl</string>
+				<string>ndjson</string>
+			</array>
+			<key>BBLMLanguageServerInfo</key>
+			<dict>
+				<key>ServerCommand</key>
+				<string>jsonl-lsp</string>
+				<key>ServerArguments</key>
+				<array>
+					<string>--stdio</string>
+				</array>
+				<key>ServerLanguageID</key>
+				<string>jsonl</string>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>
