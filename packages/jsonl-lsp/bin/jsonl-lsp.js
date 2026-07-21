@@ -3,6 +3,7 @@
 import process from "node:process";
 import {
   normalizeJsonLines,
+  renderJsonValue,
   summarizeJsonLines,
   validateJsonLines
 } from "@sarvagnan/jsonl-core";
@@ -91,7 +92,9 @@ function handleRequestOrNotification(message) {
           textDocumentSync: 1,
           documentFormattingProvider: true,
           documentRangeFormattingProvider: true,
-          documentSymbolProvider: true
+          documentSymbolProvider: true,
+          hoverProvider: true,
+          codeActionProvider: true
         },
         serverInfo: {
           name: "jsonl-lsp",
@@ -175,6 +178,16 @@ function handleRequestOrNotification(message) {
 
     if (method === "textDocument/documentSymbol") {
       respond(id, documentSymbols(params.textDocument.uri));
+      return;
+    }
+
+    if (method === "textDocument/hover") {
+      respond(id, hoverAt(params.textDocument.uri, params.position));
+      return;
+    }
+
+    if (method === "textDocument/codeAction") {
+      respond(id, codeActionsFor(params.textDocument.uri, params.range));
       return;
     }
 
@@ -289,6 +302,136 @@ function documentSymbols(uri) {
 
     return symbol;
   });
+}
+
+function hoverAt(uri, position) {
+  const document = documents.get(uri);
+
+  if (!document) {
+    return null;
+  }
+
+  const line = physicalLineAt(document.text, position.line);
+
+  if (!line || /^[ \t]*$/.test(line.text)) {
+    return null;
+  }
+
+  const result = renderJsonValue(line.text, { indent: 2 });
+
+  if (!result.ok) {
+    return null;
+  }
+
+  const { pretty, notice } = truncateHoverValue(result.output, 50000);
+
+  return {
+    contents: {
+      kind: "markdown",
+      value: `\`\`\`json\n${pretty}\n\`\`\`${notice}`
+    },
+    range: line.range
+  };
+}
+
+function codeActionsFor(uri, range) {
+  const document = documents.get(uri);
+
+  if (!document) {
+    return [];
+  }
+
+  const line = physicalLineAt(document.text, range.start.line);
+
+  if (!line) {
+    return [];
+  }
+
+  const actions = [];
+  const expanded = renderJsonValue(line.text, { indent: 2 });
+
+  if (expanded.ok && expanded.output !== line.text) {
+    actions.push(rewriteAction(
+      uri,
+      "Expand record into indented JSON",
+      line.range,
+      expanded.output
+    ));
+  }
+
+  const emptySelection = range.start.line === range.end.line &&
+    range.start.character === range.end.character;
+  const selectionRange = emptySelection ? line.range : range;
+  const selectionStart = offsetAt(document.text, selectionRange.start);
+  const selectionEnd = offsetAt(document.text, selectionRange.end);
+  const selectedText = document.text.slice(selectionStart, selectionEnd);
+  const compacted = renderJsonValue(selectedText, { indent: 0 });
+
+  if (compacted.ok && compacted.output !== selectedText) {
+    actions.push(rewriteAction(
+      uri,
+      "Compact record to one line",
+      selectionRange,
+      compacted.output
+    ));
+  }
+
+  return actions;
+}
+
+function physicalLineAt(text, lineNumber) {
+  const lines = text.split(/\r\n|\r|\n/);
+
+  if (lineNumber < 0 || lineNumber >= lines.length) {
+    return null;
+  }
+
+  return {
+    text: lines[lineNumber],
+    range: {
+      start: { line: lineNumber, character: 0 },
+      end: { line: lineNumber, character: lines[lineNumber].length }
+    }
+  };
+}
+
+function rewriteAction(uri, title, range, newText) {
+  return {
+    title,
+    kind: "refactor.rewrite",
+    edit: {
+      changes: {
+        [uri]: [
+          { range, newText }
+        ]
+      }
+    }
+  };
+}
+
+function truncateHoverValue(value, limit) {
+  if (value.length <= limit) {
+    return { pretty: value, notice: "" };
+  }
+
+  const keptLines = [];
+  let length = 0;
+
+  for (const line of value.split("\n")) {
+    const addedLength = line.length + (keptLines.length > 0 ? 1 : 0);
+
+    if (length + addedLength > limit) {
+      break;
+    }
+
+    keptLines.push(line);
+    length += addedLength;
+  }
+
+  return {
+    pretty: keptLines.join("\n"),
+    notice: "\n\n… truncated"
+  };
 }
 
 function symbolKind(valueKind) {

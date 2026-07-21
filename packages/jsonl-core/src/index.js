@@ -28,6 +28,7 @@ class JsonLineParser {
     this.index = 0;
     this.indent = options.indent ?? 0;
     this.captureMembers = options.captureMembers ?? false;
+    this.newlinesAsWhitespace = options.newlinesAsWhitespace ?? false;
     this.members = [];
     this.valueKind = null;
   }
@@ -306,7 +307,10 @@ class JsonLineParser {
   }
 
   skipWhitespace() {
-    while (!this.isEnd() && isJsonWhitespace(this.peek())) {
+    while (!this.isEnd() && (
+      isJsonWhitespace(this.peek()) ||
+      (this.newlinesAsWhitespace && (this.peek() === "\r" || this.peek() === "\n"))
+    )) {
       this.advance();
     }
   }
@@ -483,6 +487,35 @@ export function formatJsonRecord(text, options = {}) {
   };
 }
 
+export function renderJsonValue(text, options = {}) {
+  const indent = options.indent ?? 2;
+
+  try {
+    const output = new JsonLineParser(text, {
+      indent,
+      newlinesAsWhitespace: true
+    }).parse();
+
+    return {
+      ok: true,
+      diagnostics: [],
+      output
+    };
+  } catch (error) {
+    if (error instanceof JsonLineParseError) {
+      const { line, column } = lineAndColumnAt(text, error.index);
+
+      return {
+        ok: false,
+        diagnostics: [createDiagnostic(line, column, error.message)],
+        output: null
+      };
+    }
+
+    throw error;
+  }
+}
+
 export function isSupportedJsonLinesPath(path) {
   return /\.(jsonl|ndjson)$/i.test(path);
 }
@@ -567,6 +600,34 @@ function createDiagnostic(line, column, message) {
     message,
     severity: "error"
   };
+}
+
+function lineAndColumnAt(text, offset) {
+  const target = Math.max(0, Math.min(offset, text.length));
+  let line = 1;
+  let column = 1;
+
+  for (let index = 0; index < target; index += 1) {
+    if (text[index] === "\r") {
+      if (text[index + 1] === "\n" && index + 1 < target) {
+        index += 1;
+      }
+
+      line += 1;
+      column = 1;
+      continue;
+    }
+
+    if (text[index] === "\n") {
+      line += 1;
+      column = 1;
+      continue;
+    }
+
+    column += 1;
+  }
+
+  return { line, column };
 }
 
 function firstNonWhitespaceColumn(text) {

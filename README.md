@@ -82,6 +82,8 @@ Initial capabilities:
 - `textDocument/publishDiagnostics`
 - `textDocument/formatting`
 - `textDocument/rangeFormatting`
+- `textDocument/hover`
+- `textDocument/codeAction`
 
 The server accepts initialization options under `jsonl`:
 

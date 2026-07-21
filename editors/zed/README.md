@@ -4,6 +4,8 @@ JSONL Tools adds JSON Lines (`.jsonl`) and NDJSON (`.ndjson`) support to Zed, wi
 
 The extension also runs [`jsonl-lsp`](https://www.npmjs.com/package/@sarvagnan/jsonl-lsp) for JSONL diagnostics, document and range formatting, and a record-oriented document outline. If a `jsonl-lsp` executable is available on the worktree's `PATH`, the extension uses it directly. Otherwise, it installs `@sarvagnan/jsonl-lsp` with Zed's npm/Node.js support on first use and keeps the package current.
 
+It also provides hover-based record inspection and expand/compact code actions for JSONL records.
+
 ## Install as a development extension
 
 1. Open Zed's Extensions view.

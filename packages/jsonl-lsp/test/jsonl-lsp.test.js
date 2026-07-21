@@ -284,6 +284,187 @@ test("lsp advertises and returns hierarchical document symbols", async () => {
   }
 });
 
+test("lsp advertises record inspection and hovers valid physical lines", async () => {
+  const server = spawn(process.execPath, [LSP], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const client = new LspTestClient(server);
+  const uri = "file:///tmp/hover.jsonl";
+  const validLine = '{"name":"alice","items":[1,2]}';
+  const text = `${validLine}\r\nnot json\r\n \t`;
+
+  try {
+    const initialize = await client.request("initialize", { capabilities: {} });
+    assert.equal(initialize.capabilities.hoverProvider, true);
+    assert.equal(initialize.capabilities.codeActionProvider, true);
+
+    client.notify("textDocument/didOpen", {
+      textDocument: {
+        uri,
+        languageId: "jsonl",
+        version: 1,
+        text
+      }
+    });
+    await client.nextNotification("textDocument/publishDiagnostics");
+
+    const hover = await client.request("textDocument/hover", {
+      textDocument: { uri },
+      position: { line: 0, character: 8 }
+    });
+
+    assert.deepEqual(hover, {
+      contents: {
+        kind: "markdown",
+        value: "```json\n{\n  \"name\": \"alice\",\n  \"items\": [\n    1,\n    2\n  ]\n}\n```"
+      },
+      range: {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: validLine.length }
+      }
+    });
+
+    const invalidHover = await client.request("textDocument/hover", {
+      textDocument: { uri },
+      position: { line: 1, character: 2 }
+    });
+    const blankHover = await client.request("textDocument/hover", {
+      textDocument: { uri },
+      position: { line: 2, character: 1 }
+    });
+
+    assert.equal(invalidHover, null);
+    assert.equal(blankHover, null);
+  } finally {
+    await client.shutdown();
+  }
+});
+
+test("lsp offers expand and compact code actions with a round trip", async () => {
+  const server = spawn(process.execPath, [LSP], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const client = new LspTestClient(server);
+  const uri = "file:///tmp/actions.jsonl";
+  const text = '{"a": 1,"b":[1,2, 3]}';
+  const compact = '{"a":1,"b":[1,2,3]}';
+  const expanded = '{\n  "a": 1,\n  "b": [\n    1,\n    2,\n    3\n  ]\n}';
+  const lineRange = {
+    start: { line: 0, character: 0 },
+    end: { line: 0, character: text.length }
+  };
+
+  try {
+    await client.request("initialize", { capabilities: {} });
+    client.notify("textDocument/didOpen", {
+      textDocument: {
+        uri,
+        languageId: "jsonl",
+        version: 1,
+        text
+      }
+    });
+    await client.nextNotification("textDocument/publishDiagnostics");
+
+    const actions = await client.request("textDocument/codeAction", {
+      textDocument: { uri },
+      range: {
+        start: { line: 0, character: 5 },
+        end: { line: 0, character: 5 }
+      },
+      context: { diagnostics: [] }
+    });
+
+    assert.deepEqual(actions, [
+      {
+        title: "Expand record into indented JSON",
+        kind: "refactor.rewrite",
+        edit: {
+          changes: {
+            [uri]: [
+              { range: lineRange, newText: expanded }
+            ]
+          }
+        }
+      },
+      {
+        title: "Compact record to one line",
+        kind: "refactor.rewrite",
+        edit: {
+          changes: {
+            [uri]: [
+              { range: lineRange, newText: compact }
+            ]
+          }
+        }
+      }
+    ]);
+
+    client.notify("textDocument/didChange", {
+      textDocument: { uri, version: 2 },
+      contentChanges: [
+        { text: expanded }
+      ]
+    });
+    await client.nextNotification("textDocument/publishDiagnostics");
+
+    const expandedLines = expanded.split("\n");
+    const compactActions = await client.request("textDocument/codeAction", {
+      textDocument: { uri },
+      range: {
+        start: { line: 0, character: 0 },
+        end: {
+          line: expandedLines.length - 1,
+          character: expandedLines.at(-1).length
+        }
+      },
+      context: { diagnostics: [] }
+    });
+
+    assert.equal(compactActions.length, 1);
+    assert.equal(compactActions[0].title, "Compact record to one line");
+    assert.equal(compactActions[0].kind, "refactor.rewrite");
+    assert.equal(compactActions[0].edit.changes[uri][0].newText, compact);
+  } finally {
+    await client.shutdown();
+  }
+});
+
+test("lsp returns no code actions for invalid JSON", async () => {
+  const server = spawn(process.execPath, [LSP], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const client = new LspTestClient(server);
+  const uri = "file:///tmp/invalid-actions.jsonl";
+  const text = '{"a":}';
+
+  try {
+    await client.request("initialize", { capabilities: {} });
+    client.notify("textDocument/didOpen", {
+      textDocument: {
+        uri,
+        languageId: "jsonl",
+        version: 1,
+        text
+      }
+    });
+    await client.nextNotification("textDocument/publishDiagnostics");
+
+    const actions = await client.request("textDocument/codeAction", {
+      textDocument: { uri },
+      range: {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: text.length }
+      },
+      context: { diagnostics: [] }
+    });
+
+    assert.deepEqual(actions, []);
+  } finally {
+    await client.shutdown();
+  }
+});
+
 class LspTestClient {
   constructor(child) {
     this.child = child;

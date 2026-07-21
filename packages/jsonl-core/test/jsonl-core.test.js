@@ -5,6 +5,7 @@ import {
   isSupportedJsonLinesPath,
   normalizeJsonLines,
   parseJsonLines,
+  renderJsonValue,
   splitPhysicalLines,
   summarizeJsonLines,
   validateJsonLines
@@ -159,6 +160,68 @@ test("pretty printing with indent 0 stays compact", () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.output, '{"a":[1,2]}\n');
+});
+
+test("renders a multi-line JSON value compactly", () => {
+  const result = renderJsonValue('{\n  "a": [\n    1,\n    2\n  ]\n}', { indent: 0 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.output, '{"a":[1,2]}');
+});
+
+test("renders a compact JSON value with the default indent and no trailing newline", () => {
+  const text = '{"a":[1,2]}';
+  const rendered = renderJsonValue(text);
+  const formatted = formatJsonRecord(text);
+
+  assert.equal(rendered.ok, true);
+  assert.equal(rendered.output, '{\n  "a": [\n    1,\n    2\n  ]\n}');
+  assert.equal(formatted.output, `${rendered.output}\n`);
+});
+
+test("rendering rejects a raw newline inside a JSON string", () => {
+  const result = renderJsonValue('{"a":"x\ny"}');
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.diagnostics, [
+    {
+      line: 1,
+      column: 8,
+      message: "Unescaped control character in string",
+      severity: "error"
+    }
+  ]);
+});
+
+test("rendering preserves number lexemes, key order, and duplicate keys", () => {
+  const result = renderJsonValue('{\n"z": 1.50,\n"a": 2,\n"z": 1E5\n}', { indent: 0 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.output, '{"z":1.50,"a":2,"z":1E5}');
+});
+
+test("rendering supports compact and pretty output for the same multi-line value", () => {
+  const text = '[\r\n { "a": 1 },\r true\n]';
+
+  assert.equal(renderJsonValue(text, { indent: 0 }).output, '[{"a":1},true]');
+  assert.equal(
+    renderJsonValue(text, { indent: 2 }).output,
+    '[\n  {\n    "a": 1\n  },\n  true\n]'
+  );
+});
+
+test("rendering reports multi-line invalid JSON at a one-based line and column", () => {
+  const result = renderJsonValue('{\n  "a": 1,\n}');
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.diagnostics, [
+    {
+      line: 3,
+      column: 1,
+      message: "Trailing commas are not valid JSON",
+      severity: "error"
+    }
+  ]);
 });
 
 test("a line of non-breaking spaces is malformed JSON, not blank", () => {
