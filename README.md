@@ -14,7 +14,7 @@ the packages themselves are editor-neutral.
 
 This project is fully vibe coded — written end to end by Claude.
 
-Layout:
+## Layout
 
 - `packages/jsonl-core` (`@sarva/jsonl-core`): line-by-line JSONL parsing,
   validation diagnostics, and normalization
