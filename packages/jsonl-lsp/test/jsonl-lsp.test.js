@@ -141,6 +141,149 @@ test("lsp applies ranged didChange deltas instead of clobbering the document", a
   }
 });
 
+test("lsp advertises and returns hierarchical document symbols", async () => {
+  const server = spawn(process.execPath, [LSP], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const client = new LspTestClient(server);
+  const uri = "file:///tmp/symbols.jsonl";
+  const text = '{"name":"alice","age":30}\r\n' +
+    '{"foo":"bar","baz":1}\r' +
+    "[1,2,3]\n" +
+    "not json\r\n" +
+    " \t";
+
+  try {
+    const initialize = await client.request("initialize", { capabilities: {} });
+    assert.equal(initialize.capabilities.documentSymbolProvider, true);
+
+    client.notify("textDocument/didOpen", {
+      textDocument: {
+        uri,
+        languageId: "jsonl",
+        version: 1,
+        text
+      }
+    });
+    await client.nextNotification("textDocument/publishDiagnostics");
+
+    const symbols = await client.request("textDocument/documentSymbol", {
+      textDocument: { uri }
+    });
+
+    assert.equal(symbols.length, 4);
+    assert.deepEqual(
+      symbols.map(({ name, kind, range, selectionRange }) => ({
+        name,
+        kind,
+        range,
+        selectionRange
+      })),
+      [
+        {
+          name: "name: alice",
+          kind: 19,
+          range: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: 25 }
+          },
+          selectionRange: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: 25 }
+          }
+        },
+        {
+          name: "foo: bar",
+          kind: 19,
+          range: {
+            start: { line: 1, character: 0 },
+            end: { line: 1, character: 21 }
+          },
+          selectionRange: {
+            start: { line: 1, character: 0 },
+            end: { line: 1, character: 21 }
+          }
+        },
+        {
+          name: "[1,2,3]",
+          kind: 18,
+          range: {
+            start: { line: 2, character: 0 },
+            end: { line: 2, character: 7 }
+          },
+          selectionRange: {
+            start: { line: 2, character: 0 },
+            end: { line: 2, character: 7 }
+          }
+        },
+        {
+          name: "✗ invalid JSON",
+          kind: 21,
+          range: {
+            start: { line: 3, character: 0 },
+            end: { line: 3, character: 8 }
+          },
+          selectionRange: {
+            start: { line: 3, character: 0 },
+            end: { line: 3, character: 8 }
+          }
+        }
+      ]
+    );
+
+    assert.deepEqual(
+      symbols[0].children.map(({ name, kind, range, selectionRange }) => ({
+        name,
+        kind,
+        range,
+        selectionRange,
+        rangeText: text.split(/\r\n|\r|\n/)[range.start.line].slice(
+          range.start.character,
+          range.end.character
+        ),
+        selectionText: text.split(/\r\n|\r|\n/)[selectionRange.start.line].slice(
+          selectionRange.start.character,
+          selectionRange.end.character
+        )
+      })),
+      [
+        {
+          name: "name",
+          kind: 15,
+          range: {
+            start: { line: 0, character: 2 },
+            end: { line: 0, character: 15 }
+          },
+          selectionRange: {
+            start: { line: 0, character: 2 },
+            end: { line: 0, character: 6 }
+          },
+          rangeText: 'name":"alice"',
+          selectionText: "name"
+        },
+        {
+          name: "age",
+          kind: 16,
+          range: {
+            start: { line: 0, character: 17 },
+            end: { line: 0, character: 24 }
+          },
+          selectionRange: {
+            start: { line: 0, character: 17 },
+            end: { line: 0, character: 20 }
+          },
+          rangeText: 'age":30',
+          selectionText: "age"
+        }
+      ]
+    );
+    assert.equal("children" in symbols[2], false);
+    assert.equal("children" in symbols[3], false);
+  } finally {
+    await client.shutdown();
+  }
+});
+
 class LspTestClient {
   constructor(child) {
     this.child = child;

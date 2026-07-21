@@ -30,6 +30,10 @@ test: $(BUILDDIR)/harness
 	@node ../../../packages/jsonl-cli/bin/jsonl.js format test/fixtures/parity.jsonl > $(BUILDDIR)/parity-cli.out
 	@$(BUILDDIR)/harness reformat test/fixtures/parity.jsonl > $(BUILDDIR)/parity-module.out
 	@diff $(BUILDDIR)/parity-cli.out $(BUILDDIR)/parity-module.out && echo "ok: reformat parity with jsonl-cli"
+	@$(BUILDDIR)/harness titles test/fixtures/summaries.jsonl > $(BUILDDIR)/summaries-module.out
+	@sed 's/^[0-9][0-9]* · //' $(BUILDDIR)/summaries-module.out > $(BUILDDIR)/summaries-module-names.out
+	@node --input-type=module -e 'import { readFileSync } from "node:fs"; import { summarizeJsonLines } from "../../../packages/jsonl-core/src/index.js"; const text = readFileSync("test/fixtures/summaries.jsonl", "utf8"); for (const summary of summarizeJsonLines(text)) console.log(summary.name);' > $(BUILDDIR)/summaries-jsonl-core-names.out
+	@diff $(BUILDDIR)/summaries-module-names.out $(BUILDDIR)/summaries-jsonl-core-names.out && echo "ok: summary parity with jsonl-core"
 
 $(BUILDDIR)/harness: test/harness.mm $(SRCS) $(HDRS) sdk/BBLMInterface.mm Makefile
 	mkdir -p $(BUILDDIR)

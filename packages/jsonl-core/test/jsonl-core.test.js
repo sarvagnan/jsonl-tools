@@ -6,6 +6,7 @@ import {
   normalizeJsonLines,
   parseJsonLines,
   splitPhysicalLines,
+  summarizeJsonLines,
   validateJsonLines
 } from "../src/index.js";
 
@@ -166,4 +167,114 @@ test("a line of non-breaking spaces is malformed JSON, not blank", () => {
   assert.equal(result.ok, false);
   assert.equal(result.diagnostics.length, 1);
   assert.equal(result.diagnostics[0].line, 2);
+});
+
+test("summaries choose the best preferred scalar key", () => {
+  const summaries = summarizeJsonLines([
+    '{"status":"late","type":"event"}',
+    '{"name":{"nested":true},"status":"ready"}',
+    '{"name":"","title":"fallback"}',
+    '{"name":"raw\\ntext"}'
+  ].join("\n"));
+
+  assert.deepEqual(
+    summaries.map((summary) => summary.name),
+    ["type: event", "status: ready", "title: fallback", "name: raw\\ntext"]
+  );
+});
+
+test("summaries fall back to the first object member", () => {
+  const summaries = summarizeJsonLines([
+    '{"foo":"bar","baz":1}',
+    '{"data":{"x":1},"extra":2}',
+    '{"items":[1,2],"extra":2}',
+    '{"foo":"","extra":2}',
+    '{"":1}',
+    "{}"
+  ].join("\n"));
+
+  assert.deepEqual(
+    summaries.map((summary) => summary.name),
+    ["foo: bar", "data: …", "items: …", "foo: …", ": 1", "{}"]
+  );
+});
+
+test("summaries describe arrays and each kind of top-level scalar", () => {
+  const summaries = summarizeJsonLines(' \t[1,2,3]\t \n 42 \n "hello"\t\n true\nfalse\n null ');
+
+  assert.deepEqual(
+    summaries.map(({ name, valueKind, members }) => ({ name, valueKind, members })),
+    [
+      { name: "[1,2,3]", valueKind: "array", members: [] },
+      { name: "42", valueKind: "number", members: [] },
+      { name: '"hello"', valueKind: "string", members: [] },
+      { name: "true", valueKind: "boolean", members: [] },
+      { name: "false", valueKind: "boolean", members: [] },
+      { name: "null", valueKind: "null", members: [] }
+    ]
+  );
+});
+
+test("summaries mark invalid lines and skip blank physical lines", () => {
+  const text = '{"name":"first"}\r\n \t\rnot json\n\n42';
+  const summaries = summarizeJsonLines(text);
+
+  assert.deepEqual(
+    summaries.map(({ line, valid, name }) => ({ line, valid, name })),
+    [
+      { line: 1, valid: true, name: "name: first" },
+      { line: 3, valid: false, name: "✗ invalid JSON" },
+      { line: 5, valid: true, name: "42" }
+    ]
+  );
+  assert.deepEqual(summaries[1].members, []);
+});
+
+test("summary truncation follows the 48 UTF-16-unit boundary", () => {
+  const plain47 = "a".repeat(47);
+  const plain48 = "b".repeat(48);
+  const plain49 = "c".repeat(49);
+  const summaries = summarizeJsonLines([
+    JSON.stringify({ name: plain47 }),
+    JSON.stringify({ name: plain48 }),
+    JSON.stringify({ name: plain49 }),
+    JSON.stringify([plain49])
+  ].join("\n"));
+
+  assert.equal(summaries[0].name, `name: ${plain47}`);
+  assert.equal(summaries[1].name, `name: ${plain48}`);
+  assert.equal(summaries[2].name, `name: ${"c".repeat(48)}…`);
+  assert.equal(summaries[3].name, `${JSON.stringify([plain49]).slice(0, 48)}…`);
+});
+
+test("summary truncation never splits a surrogate pair", () => {
+  const value = `${"a".repeat(47)}😀z`;
+  const [summary] = summarizeJsonLines(JSON.stringify({ name: value }));
+
+  assert.equal(summary.name, `name: ${"a".repeat(47)}…`);
+  assert.equal(summary.name.includes("\ud83d"), false);
+});
+
+test("summaries expose document-absolute top-level member offsets and kinds", () => {
+  const text = '{"before":0}\r\n\t\n  { "alpha" : "x", "items": [1], "alpha": false, "nothing": null }';
+  const summaries = summarizeJsonLines(text);
+  const summary = summaries[1];
+
+  assert.equal(summary.line, 3);
+  assert.equal(summary.startOffset, text.indexOf("  {"));
+  assert.equal(summary.endOffset, text.length);
+  assert.deepEqual(
+    summary.members.map((member) => ({
+      key: member.key,
+      keyText: text.slice(member.keyStart, member.keyEnd),
+      valueText: text.slice(member.valueStart, member.valueEnd),
+      valueKind: member.valueKind
+    })),
+    [
+      { key: "alpha", keyText: "alpha", valueText: '"x"', valueKind: "string" },
+      { key: "items", keyText: "items", valueText: "[1]", valueKind: "array" },
+      { key: "alpha", keyText: "alpha", valueText: "false", valueKind: "boolean" },
+      { key: "nothing", keyText: "nothing", valueText: "null", valueKind: "null" }
+    ]
+  );
 });

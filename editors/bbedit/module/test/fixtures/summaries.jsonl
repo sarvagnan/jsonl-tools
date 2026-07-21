@@ -1,0 +1,10 @@
+{"name":"alice","id":1}
+{"url":"https://example.com","status":"ready"}
+{"foo":"bar","baz":1}
+{"data":{"x":1},"extra":2}
+{}
+[1,2,3]
+42
+not json at all
+{"name":"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"}
+{"title":"hello 😀 café"}

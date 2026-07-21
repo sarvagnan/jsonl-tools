@@ -910,7 +910,7 @@ static NSString *RecordMenuTitle(const UInt32 lineNumber,
 						TruncateForDisplay(StringFromU16(parse.summaryValue), 48)];
 		}
 
-		if (! parse.firstKey.empty())
+		if (parse.sawFirstMember)
 		{
 			NSString	*value = parse.firstValue.empty()
 								? @"…"
@@ -929,12 +929,14 @@ static NSString *RecordMenuTitle(const UInt32 lineNumber,
 	while ((start < lineChars.size()) && IsJSONWhitespace(lineChars[start]))
 		start++;
 
-	const size_t	previewLength = std::min<size_t>(lineChars.size() - start, 48);
-	NSString		*preview = [[[NSString alloc] initWithCharacters: lineChars.data() + start
-															  length: previewLength] autorelease];
+	size_t	end = lineChars.size();
 
-	if ((start + previewLength) < lineChars.size())
-		preview = [preview stringByAppendingString: @"…"];
+	while ((end > start) && IsJSONWhitespace(lineChars[end - 1]))
+		end--;
+
+	NSString	*raw = [[[NSString alloc] initWithCharacters: lineChars.data() + start
+													 length: end - start] autorelease];
+	NSString	*preview = TruncateForDisplay(raw, 48);
 
 	return [NSString stringWithFormat: @"%u · %@", (unsigned)lineNumber, preview];
 }

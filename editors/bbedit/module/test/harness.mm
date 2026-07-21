@@ -3,8 +3,9 @@
 //
 //	Fakes BBEdit's callback block, drives the module entry point with the
 //	same messages BBEdit sends, and asserts on the results. Run with no
-//	arguments for the unit tests, or `harness reformat <file>` to print the
-//	module's document reformat of a file (for diffing against jsonl-core).
+//	arguments for the unit tests, `harness reformat <file>` to print the
+//	module's document reformat of a file, or `harness titles <file>` to print
+//	its function-menu titles (for diffing against jsonl-core).
 //
 
 #include <objc/objc.h>
@@ -511,6 +512,34 @@ int main(int argc, char *argv[])
 														true, callbacks);
 
 			fputs([result UTF8String], stdout);
+			return 0;
+		}
+
+		if ((3 == argc) && (0 == strcmp(argv[1], "titles")))
+		{
+			NSString	*path = [NSString stringWithUTF8String: argv[2]];
+			NSString	*content = [NSString stringWithContentsOfFile: path
+													 encoding: NSUTF8StringEncoding
+														error: NULL];
+
+			if (nil == content)
+			{
+				fprintf(stderr, "cannot read %s\n", argv[2]);
+				return 1;
+			}
+
+			std::vector<UniChar>	text = ToUTF16(content);
+			BBLMParamBlock			params = MakeParams(text, kBBLMScanForFunctionsMessage);
+
+			if (noErr != JSONLMachO(params, callbacks))
+			{
+				fprintf(stderr, "cannot scan %s\n", argv[2]);
+				return 1;
+			}
+
+			for (const BBLMProcInfo &info : sFunctions)
+				printf("%s\n", [sTokens[info.fNameStart] UTF8String]);
+
 			return 0;
 		}
 

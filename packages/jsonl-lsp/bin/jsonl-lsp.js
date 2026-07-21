@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
 import process from "node:process";
-import { normalizeJsonLines, validateJsonLines } from "@sarvagnan/jsonl-core";
+import {
+  normalizeJsonLines,
+  summarizeJsonLines,
+  validateJsonLines
+} from "@sarvagnan/jsonl-core";
 
 const documents = new Map();
 let settings = {
@@ -86,7 +90,8 @@ function handleRequestOrNotification(message) {
         capabilities: {
           textDocumentSync: 1,
           documentFormattingProvider: true,
-          documentRangeFormattingProvider: true
+          documentRangeFormattingProvider: true,
+          documentSymbolProvider: true
         },
         serverInfo: {
           name: "jsonl-lsp",
@@ -168,6 +173,11 @@ function handleRequestOrNotification(message) {
       return;
     }
 
+    if (method === "textDocument/documentSymbol") {
+      respond(id, documentSymbols(params.textDocument.uri));
+      return;
+    }
+
     if (id !== undefined) {
       respondError(id, -32601, `Method not found: ${method}`);
     }
@@ -243,6 +253,55 @@ function formatRange(uri, range) {
   ];
 }
 
+function documentSymbols(uri) {
+  const document = documents.get(uri);
+
+  if (!document) {
+    return [];
+  }
+
+  return summarizeJsonLines(document.text, settings).map((summary) => {
+    const range = {
+      start: positionAt(document.text, summary.startOffset),
+      end: positionAt(document.text, summary.endOffset)
+    };
+    const symbol = {
+      name: summary.name,
+      kind: summary.valid ? symbolKind(summary.valueKind) : 21,
+      range,
+      selectionRange: range
+    };
+
+    if (summary.valid && summary.valueKind === "object") {
+      symbol.children = summary.members.map((member) => ({
+        name: member.key,
+        kind: symbolKind(member.valueKind),
+        range: {
+          start: positionAt(document.text, member.keyStart),
+          end: positionAt(document.text, member.valueEnd)
+        },
+        selectionRange: {
+          start: positionAt(document.text, member.keyStart),
+          end: positionAt(document.text, member.keyEnd)
+        }
+      }));
+    }
+
+    return symbol;
+  });
+}
+
+function symbolKind(valueKind) {
+  return {
+    object: 19,
+    array: 18,
+    string: 15,
+    number: 16,
+    boolean: 17,
+    null: 21
+  }[valueKind];
+}
+
 function toLspDiagnostic(diagnostic, lines) {
   const line = diagnostic.line - 1;
   const lineLength = lines[line]?.length ?? 0;
@@ -304,6 +363,36 @@ function offsetAt(text, position) {
   }
 
   return text.length;
+}
+
+function positionAt(text, offset) {
+  const target = Math.max(0, Math.min(offset, text.length));
+  let line = 0;
+  let character = 0;
+
+  for (let index = 0; index < target; index += 1) {
+    const char = text[index];
+
+    if (char === "\r") {
+      if (text[index + 1] === "\n" && index + 1 < target) {
+        index += 1;
+      }
+
+      line += 1;
+      character = 0;
+      continue;
+    }
+
+    if (char === "\n") {
+      line += 1;
+      character = 0;
+      continue;
+    }
+
+    character += 1;
+  }
+
+  return { line, character };
 }
 
 function respond(id, result) {

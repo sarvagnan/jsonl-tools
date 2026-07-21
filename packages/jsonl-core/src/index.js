@@ -5,6 +5,11 @@ const DEFAULT_OPTIONS = {
   finalNewline: "preserve"
 };
 
+const SUMMARY_KEYS = [
+  "name", "title", "type", "event", "kind", "role", "method",
+  "id", "status", "level", "msg", "message", "url"
+];
+
 export class JsonLineParseError extends Error {
   constructor(message, index) {
     super(message);
@@ -22,10 +27,14 @@ class JsonLineParser {
     this.text = text;
     this.index = 0;
     this.indent = options.indent ?? 0;
+    this.captureMembers = options.captureMembers ?? false;
+    this.members = [];
+    this.valueKind = null;
   }
 
   parse() {
     this.skipWhitespace();
+    this.valueKind = valueKindAt(this.text, this.index);
     const rendered = this.parseValue(0);
     this.skipWhitespace();
 
@@ -88,11 +97,28 @@ class JsonLineParser {
         this.fail('Expected object property name string');
       }
 
+      const keyLexemeStart = this.index;
       const key = this.parseString();
+      const keyStart = keyLexemeStart + 1;
+      const keyEnd = this.index - 1;
       this.skipWhitespace();
       this.consume(":", "Expected ':' after object property name");
       this.skipWhitespace();
+      const valueStart = this.index;
       const value = this.parseValue(depth + 1);
+      const valueEnd = this.index;
+
+      if (this.captureMembers && depth === 0) {
+        this.members.push({
+          key: this.text.slice(keyStart, keyEnd),
+          keyStart,
+          keyEnd,
+          valueStart,
+          valueEnd,
+          valueKind: valueKindAt(this.text, valueStart)
+        });
+      }
+
       members.push(this.indent > 0 ? `${key}: ${value}` : `${key}:${value}`);
       this.skipWhitespace();
 
@@ -351,6 +377,55 @@ export function validateJsonLines(text, options = {}) {
   return { ok, diagnostics, lineCount, hasFinalNewline };
 }
 
+export function summarizeJsonLines(text, options = {}) {
+  normalizeOptions(options);
+  const summaries = [];
+
+  for (const line of splitPhysicalLines(text)) {
+    if (isBlankLine(line.text)) {
+      continue;
+    }
+
+    const base = {
+      line: line.number,
+      startOffset: line.startOffset,
+      endOffset: line.startOffset + line.text.length
+    };
+
+    try {
+      const parser = new JsonLineParser(line.text, { captureMembers: true });
+      parser.parse();
+      const members = parser.valueKind === "object"
+        ? parser.members.map((member) => ({
+            ...member,
+            keyStart: line.startOffset + member.keyStart,
+            keyEnd: line.startOffset + member.keyEnd,
+            valueStart: line.startOffset + member.valueStart,
+            valueEnd: line.startOffset + member.valueEnd
+          }))
+        : [];
+
+      summaries.push({
+        ...base,
+        valid: true,
+        name: summaryName(line.text, parser.valueKind, parser.members),
+        members,
+        valueKind: parser.valueKind
+      });
+    } catch {
+      summaries.push({
+        ...base,
+        valid: false,
+        name: "✗ invalid JSON",
+        members: [],
+        valueKind: null
+      });
+    }
+  }
+
+  return summaries;
+}
+
 export function normalizeJsonLines(text, options = {}) {
   const settings = normalizeOptions(options);
   const parsed = parseJsonLines(text, settings);
@@ -505,6 +580,91 @@ function hasFinalLineEnding(text) {
 
 function isJsonWhitespace(char) {
   return char === " " || char === "\t";
+}
+
+function summaryName(text, valueKind, members) {
+  if (valueKind !== "object") {
+    return truncateForDisplay(text.replace(/^[ \t]+|[ \t]+$/g, ""), 48);
+  }
+
+  let bestMember;
+  let bestPriority = SUMMARY_KEYS.length;
+
+  for (const member of members) {
+    const priority = SUMMARY_KEYS.indexOf(member.key);
+    const displayValue = memberDisplayValue(text, member);
+
+    if (priority !== -1 && priority < bestPriority && displayValue !== "") {
+      bestMember = member;
+      bestPriority = priority;
+    }
+  }
+
+  if (bestMember) {
+    return `${bestMember.key}: ${truncateForDisplay(memberDisplayValue(text, bestMember), 48)}`;
+  }
+
+  if (members.length === 0) {
+    return "{}";
+  }
+
+  const first = members[0];
+  const displayValue = memberDisplayValue(text, first);
+
+  return `${first.key}: ${displayValue === "" ? "…" : truncateForDisplay(displayValue, 48)}`;
+}
+
+function memberDisplayValue(text, member) {
+  if (member.valueKind === "object" || member.valueKind === "array") {
+    return "";
+  }
+
+  if (member.valueKind === "string") {
+    return text.slice(member.valueStart + 1, member.valueEnd - 1);
+  }
+
+  return text.slice(member.valueStart, member.valueEnd);
+}
+
+function truncateForDisplay(text, maxLength) {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  let cut = maxLength;
+  const characterBeforeCut = text.charCodeAt(cut - 1);
+
+  if (characterBeforeCut >= 0xd800 && characterBeforeCut <= 0xdbff) {
+    cut -= 1;
+  }
+
+  return `${text.slice(0, cut)}…`;
+}
+
+function valueKindAt(text, index) {
+  const char = text[index];
+
+  if (char === "{") {
+    return "object";
+  }
+
+  if (char === "[") {
+    return "array";
+  }
+
+  if (char === '"') {
+    return "string";
+  }
+
+  if (char === "t" || char === "f") {
+    return "boolean";
+  }
+
+  if (char === "n") {
+    return "null";
+  }
+
+  return "number";
 }
 
 //	Blank-line detection must use the same whitespace definition as the
