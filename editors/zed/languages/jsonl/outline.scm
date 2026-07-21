@@ -5,11 +5,15 @@
     (pair
       key: (string) @name)) @item)
 
-; Empty objects and other top-level JSON values use their own text as a label.
+; Empty objects use their own text as the label. The anchor between the
+; braces admits no named child, i.e. no pairs.
 (document
   (object
+    .
     "{"
-    "}") @name @item)
+    .
+    "}"
+    .) @name @item)
 
 (document
   [

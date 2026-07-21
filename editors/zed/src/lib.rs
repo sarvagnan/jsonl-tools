@@ -29,22 +29,30 @@ impl JsonlToolsExtension {
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        let latest_version = zed::npm_package_latest_version(PACKAGE_NAME).map_err(|error| {
-            format!("failed to find the latest {PACKAGE_NAME} version: {error}")
-        })?;
-        let installed_version =
-            zed::npm_package_installed_version(PACKAGE_NAME).map_err(|error| {
-                format!("failed to inspect the installed {PACKAGE_NAME} version: {error}")
-            })?;
+        //	an existing install keeps working when the registry is unreachable
+        match zed::npm_package_latest_version(PACKAGE_NAME) {
+            Ok(latest_version) => {
+                let installed_version = zed::npm_package_installed_version(PACKAGE_NAME)
+                    .ok()
+                    .flatten();
 
-        if !Self::server_exists() || installed_version.as_ref() != Some(&latest_version) {
-            zed::set_language_server_installation_status(
-                language_server_id,
-                &zed::LanguageServerInstallationStatus::Downloading,
-            );
-            zed::npm_install_package(PACKAGE_NAME, &latest_version).map_err(|error| {
-                format!("failed to install {PACKAGE_NAME}@{latest_version}: {error}")
-            })?;
+                if !Self::server_exists() || installed_version.as_ref() != Some(&latest_version) {
+                    zed::set_language_server_installation_status(
+                        language_server_id,
+                        &zed::LanguageServerInstallationStatus::Downloading,
+                    );
+                    zed::npm_install_package(PACKAGE_NAME, &latest_version).map_err(|error| {
+                        format!("failed to install {PACKAGE_NAME}@{latest_version}: {error}")
+                    })?;
+                }
+            }
+            Err(error) => {
+                if !Self::server_exists() {
+                    return Err(format!(
+                        "failed to find the latest {PACKAGE_NAME} version: {error}"
+                    ));
+                }
+            }
         }
 
         if !Self::server_exists() {
