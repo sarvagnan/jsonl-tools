@@ -12,8 +12,8 @@ Server Protocol server, and editor integrations that consume them.
 BBEdit is the first integration (a native compiled language module);
 the packages themselves are editor-neutral.
 
-Fittingly, this project is fully vibe coded — written end to end by
-Claude, from the BBEdit SDK research to the compiled language module.
+This project is fully vibe coded — written end to end by Claude, from
+the BBEdit SDK research to the compiled language module.
 
 Layout:
 
@@ -29,7 +29,11 @@ Layout:
   language guessing, LSP hookup) built against the official Bare Bones
   Language Module SDK, plus text filters
 
-The packages are npm workspaces; run `npm install` once at the root.
+The packages are npm workspaces; everything below assumes `npm install`
+has been run once at the root (it wires up the cross-package symlinks).
+
+Requirements: Node ≥ 20; the BBEdit module additionally needs macOS with
+the Xcode command line tools.
 
 ## CLI
 
@@ -91,7 +95,9 @@ The server accepts initialization options under `jsonl`:
 ## BBEdit
 
 ```bash
+npm install                                             # once, at the root
 cd editors/bbedit/module && make test && make install   # native language module
+cd -
 (cd packages/jsonl-cli && npm link)                     # jsonl on PATH
 (cd packages/jsonl-lsp && npm link)                     # jsonl-lsp on PATH
 ```
@@ -103,6 +109,7 @@ text filters.
 ## Tests
 
 ```bash
+npm install           # once, at the root
 npm test              # workspace packages + editor filter scripts
 npm run test:module   # compiled module: harness + reformat parity with the CLI
 ```
