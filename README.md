@@ -16,11 +16,11 @@ This project is fully vibe coded — written end to end by Claude.
 
 ## Layout
 
-- `packages/jsonl-core` (`@sarva/jsonl-core`): line-by-line JSONL parsing,
+- `packages/jsonl-core` (`@sarvagnan/jsonl-core`): line-by-line JSONL parsing,
   validation diagnostics, and normalization
-- `packages/jsonl-cli` (`@sarva/jsonl-cli`): command-line validation and
+- `packages/jsonl-cli` (`@sarvagnan/jsonl-cli`): command-line validation and
   formatting; installs the `jsonl` binary
-- `packages/jsonl-lsp` (`@sarva/jsonl-lsp`): stdio LSP server for
+- `packages/jsonl-lsp` (`@sarvagnan/jsonl-lsp`): stdio LSP server for
   diagnostics and formatting, usable from any LSP-capable editor
   (BBEdit, Neovim, Helix, Zed, Emacs, …); installs the `jsonl-lsp` binary
 - `editors/bbedit`: BBEdit integration — compiled language module (syntax
@@ -63,7 +63,7 @@ import {
   normalizeJsonLines,
   parseJsonLines,
   validateJsonLines
-} from "@sarva/jsonl-core";
+} from "@sarvagnan/jsonl-core";
 ```
 
 Diagnostics are reported with one-based `line` and `column` fields suitable for editor display.

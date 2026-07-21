@@ -1,5 +1,5 @@
-# @sarva/jsonl-cli
+# @sarvagnan/jsonl-cli
 
 `jsonl` — command-line validation and formatting for JSON Lines / NDJSON:
 `validate`, `format [--check]`, `normalize`, `pretty-record`. Built on
-`@sarva/jsonl-core`. Part of [jsonl-tools](../../README.md).
+`@sarvagnan/jsonl-core`. Part of [jsonl-tools](../../README.md).

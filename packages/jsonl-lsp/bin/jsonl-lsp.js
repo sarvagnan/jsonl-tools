@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import process from "node:process";
-import { normalizeJsonLines, validateJsonLines } from "@sarva/jsonl-core";
+import { normalizeJsonLines, validateJsonLines } from "@sarvagnan/jsonl-core";
 
 const documents = new Map();
 let settings = {

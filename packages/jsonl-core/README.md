@@ -1,4 +1,4 @@
-# @sarva/jsonl-core
+# @sarvagnan/jsonl-core
 
 Line-by-line JSON Lines / NDJSON parsing, validation diagnostics (one-based
 line/column), and normalization. Strict JSON grammar; number lexemes, key

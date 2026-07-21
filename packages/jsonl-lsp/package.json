@@ -1,5 +1,5 @@
 {
-  "name": "@sarva/jsonl-lsp",
+  "name": "@sarvagnan/jsonl-lsp",
   "version": "0.1.0",
   "description": "Language Server Protocol server (stdio) providing diagnostics and formatting for JSON Lines / NDJSON.",
   "type": "module",
@@ -10,7 +10,7 @@
     "bin"
   ],
   "dependencies": {
-    "@sarva/jsonl-core": "^0.1.0"
+    "@sarvagnan/jsonl-core": "^0.1.0"
   },
   "scripts": {
     "test": "node --test"

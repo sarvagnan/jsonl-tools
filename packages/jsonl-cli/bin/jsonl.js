@@ -7,7 +7,7 @@ import {
   formatJsonRecord,
   normalizeJsonLines,
   validateJsonLines
-} from "@sarva/jsonl-core";
+} from "@sarvagnan/jsonl-core";
 
 const USAGE = `Usage:
   jsonl validate [--allow-blank-lines] [file ...]

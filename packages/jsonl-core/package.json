@@ -1,5 +1,5 @@
 {
-  "name": "@sarva/jsonl-core",
+  "name": "@sarvagnan/jsonl-core",
   "version": "0.1.0",
   "description": "Line-by-line JSON Lines / NDJSON parsing, validation diagnostics, and normalization.",
   "type": "module",
