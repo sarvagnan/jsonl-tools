@@ -1,10 +1,12 @@
-# JSONL Tools for Zed
+# JSONL LSP for Zed
 
-JSONL Tools adds JSON Lines (`.jsonl`) and NDJSON (`.ndjson`) support to Zed, with `.ldjson` recognized as an additional common suffix. It uses the JSON tree-sitter grammar for syntax highlighting, bracket matching, indentation, and a basic structural outline with one item per top-level record.
+Language-server support for JSON Lines (`.jsonl`) and NDJSON (`.ndjson`) in Zed: per-record diagnostics as you type, document and range formatting, record-oriented document outlines, hover-based record inspection (pretty-printed JSON in a popup), and expand/compact code actions.
 
-The extension also runs [`jsonl-lsp`](https://www.npmjs.com/package/@sarvagnan/jsonl-lsp) for JSONL diagnostics, document and range formatting, and a record-oriented document outline. If a `jsonl-lsp` executable is available on the worktree's `PATH`, the extension uses it directly. Otherwise, it installs `@sarvagnan/jsonl-lsp` with Zed's npm/Node.js support on first use and keeps the package current.
+This extension runs [`jsonl-lsp`](https://www.npmjs.com/package/@sarvagnan/jsonl-lsp). If a `jsonl-lsp` executable is available on the worktree's `PATH`, the extension uses it directly. Otherwise, it installs `@sarvagnan/jsonl-lsp` with Zed's npm/Node.js support on first use and keeps the package current.
 
-It also provides hover-based record inspection and expand/compact code actions for JSONL records.
+## Requirements
+
+The [JSONL extension](https://zed.dev/extensions/jsonl) must be installed — it provides the "JSON Lines" language (grammar, highlighting, and file associations) that this server attaches to. Zed will suggest it automatically when you open a `.jsonl` file.
 
 ## Install as a development extension
 
@@ -16,22 +18,25 @@ You can also run `zed: install dev extension` from the command palette and selec
 
 ## LSP-powered document outlines
 
-Enable language-server document symbols for record-oriented outline entries:
+Enable language-server document symbols for record-oriented outline entries (one per record, named from its most informative key, with expandable top-level fields):
 
 ```json
-{ "languages": { "JSONL": { "document_symbols": "on" } } }
+{ "languages": { "JSON Lines": { "document_symbols": "on" } } }
 ```
 
-Without that setting, Zed can use the extension's basic tree-sitter structural outline fallback.
+## Record inspection
+
+- **Hover** any record to see it pretty-printed in a popup.
+- **Code actions** (`cmd-.` on a record) offer *Expand record into indented JSON* and *Compact record to one line* — expand to read or edit comfortably, then compact back (or undo).
 
 ## Formatting
 
-`jsonl-lsp` advertises both `documentFormatting` and `documentRangeFormatting`. Zed's standard `format_on_save` language setting therefore works for JSONL when the language server is active. For example:
+`jsonl-lsp` advertises both `documentFormatting` and `documentRangeFormatting`, so Zed's standard formatter settings work for JSON Lines documents:
 
 ```json
 {
   "languages": {
-    "JSONL": {
+    "JSON Lines": {
       "formatter": "language_server",
       "format_on_save": "on"
     }
@@ -39,10 +44,11 @@ Without that setting, Zed can use the extension's basic tree-sitter structural o
 }
 ```
 
+If another extension also registers a formatter for JSON Lines, the `formatter` setting above selects which one is used.
+
 ## Server configuration
 
-`jsonl-lsp` accepts initialization options under the `jsonl` key, forwarded
-from Zed's standard LSP settings:
+`jsonl-lsp` accepts initialization options under the `jsonl` key, forwarded from Zed's standard LSP settings:
 
 ```json
 {
